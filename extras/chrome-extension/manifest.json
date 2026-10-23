@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Aspen Paste Grades",
+  "version": "0.1.0",
+  "description": "Paste scores from a spreadsheet into an Aspen gradebook column. Runs entirely in your browser; no network access, no stored data.",
+  "content_scripts": [
+    {
+      "matches": ["https://*.myfollett.com/aspen/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "world": "MAIN"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+name: Test and build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (logic + window smoke test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: System packages (Tk and a virtual screen)
+        run: sudo apt-get update && sudo apt-get install -y python3-tk xvfb scrot
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+      - name: Open the window, click through it, close it
+        run: xvfb-run -a python ogts.py --gui-smoketest
+
+  build-windows:
+    name: Build Windows app
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: pyinstaller --onefile --windowed --name OpenGradeTransferSystem ogts.py
+      - name: Self-check the packaged app
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\OpenGradeTransferSystem.exe -ArgumentList "--selftest","selftest.txt" -Wait -PassThru
+          if (Test-Path selftest.txt) { Get-Content selftest.txt }
+          if ($p.ExitCode -ne 0) { throw "Packaged app self-check failed (exit $($p.ExitCode))" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenGradeTransferSystem-Windows
+          path: dist/OpenGradeTransferSystem.exe
+
+  build-mac:
+    name: Build Mac app
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: pyinstaller --windowed --name OpenGradeTransferSystem ogts.py
+      - name: Self-check the packaged app
+        run: |
+          dist/OpenGradeTransferSystem.app/Contents/MacOS/OpenGradeTransferSystem --selftest selftest.txt || { cat selftest.txt || true; exit 1; }
+          cat selftest.txt
+      - name: Zip the app
+        run: ditto -c -k --sequesterRsrc --keepParent dist/OpenGradeTransferSystem.app OpenGradeTransferSystem-Mac.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenGradeTransferSystem-Mac
+          path: OpenGradeTransferSystem-Mac.zip
+
+  release:
+    name: Publish release (only when you push a version tag)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-windows, build-mac]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mv artifacts/OpenGradeTransferSystem-Windows/OpenGradeTransferSystem.exe OpenGradeTransferSystem-Windows.exe
+          mv artifacts/OpenGradeTransferSystem-Mac/OpenGradeTransferSystem-Mac.zip OpenGradeTransferSystem-Mac.zip
+          gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --title "Open Grade Transfer System ${GITHUB_REF_NAME}" \
+            --notes "Download **OpenGradeTransferSystem-Windows.exe** (Windows) or **OpenGradeTransferSystem-Mac.zip** (Mac). No Python needed. See the README for first-run steps." \
+            OpenGradeTransferSystem-Windows.exe OpenGradeTransferSystem-Mac.zip

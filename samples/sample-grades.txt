@@ -1,0 +1,6 @@
+Student	Quiz 1
+Riley Alder	88
+Sam Baker	92
+Cortez Reyes, Maria	75
+Diaz, Jamal	absent
+Priya Evans	100
