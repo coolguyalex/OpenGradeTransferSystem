@@ -87,6 +87,12 @@ jobs:
         run: |
           mv artifacts/OpenGradeTransferSystem-Windows/OpenGradeTransferSystem.exe OpenGradeTransferSystem-Windows.exe
           mv artifacts/OpenGradeTransferSystem-Mac/OpenGradeTransferSystem-Mac.zip OpenGradeTransferSystem-Mac.zip
-          gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --title "Open Grade Transfer System ${GITHUB_REF_NAME}" \
-            --notes "Download **OpenGradeTransferSystem-Windows.exe** (Windows) or **OpenGradeTransferSystem-Mac.zip** (Mac). No Python needed. See the README for first-run steps." \
-            OpenGradeTransferSystem-Windows.exe OpenGradeTransferSystem-Mac.zip
+          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            # You already made the release on the website: just attach the apps to it.
+            gh release upload "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --clobber \
+              OpenGradeTransferSystem-Windows.exe OpenGradeTransferSystem-Mac.zip
+          else
+            gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --title "Open Grade Transfer System ${GITHUB_REF_NAME}" \
+              --notes "Download **OpenGradeTransferSystem-Windows.exe** (Windows) or **OpenGradeTransferSystem-Mac.zip** (Mac). No Python needed. See the README for first-run steps." \
+              OpenGradeTransferSystem-Windows.exe OpenGradeTransferSystem-Mac.zip
+          fi
